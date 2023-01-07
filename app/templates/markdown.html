@@ -1,7 +1,7 @@
 <html>
 <body>
 <h1> Your rendered note: </h1>
-{{ rendered }}
+{{ rendered | safe }}
 <br>
 <form action={{ url_for('hello') }}>
   <input type="submit" value="Go back" />
