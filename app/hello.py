@@ -8,6 +8,7 @@ import sqlite3
 import time
 import bleach
 import random
+import re
 
 app = Flask(__name__)
 
@@ -21,9 +22,10 @@ def restore_db():
     print("[*] Init database!")
     sq = sqlite3.connect(DATABASE)
     sql = sq.cursor()
-    sql.execute("CREATE TABLE IF NOT EXISTS user (username VARCHAR(32), password VARCHAR(128));")
+    sql.execute("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY, username VARCHAR(32), password VARCHAR(128));")
+    sql.execute("CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, username VARCHAR(32), count INTEGER);")
     sql.execute(
-        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32), note VARCHAR(256), isPublic INTEGER, isProtected INTEGER, password VARCHAR(128));")
+        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32), note VARCHAR(256), pictureURL VARCHAR(256), isPublic INTEGER, isProtected INTEGER, password VARCHAR(128));")
     sq.commit()
     sq.close()
 
@@ -46,7 +48,6 @@ def user_loader(username):
         username, password = row
     except:
         return None
-
     user = User()
     user.id = username
     user.password = password
@@ -57,7 +58,6 @@ def request_loader(request):
     username = request.form.get('username')
     user = user_loader(username)
     return user
-
 recent_users = deque(maxlen=3)
 
 @app.route("/", methods=["GET", "POST"])
@@ -75,6 +75,16 @@ def login():
             login_user(user)
             return redirect('/hello')
         else:
+            #db = sqlite3.connect(DATABASE)
+            #sql = db.cursor()
+            #sql_query = "SELECT count(*) FROM login_attempts WHERE username = ?"
+            #sql.execute(sql_query, (username,))
+            #result = sql.fetchone()[0]
+            #if result == 0:
+                #sql_query = "INSERT INTO login_attempts (username, count) VALUES (?, ?);"
+                #sql.execute(sql_query, (username, 0,))
+            #else:
+            #db.commit()
             return "Nieprawidłowy login lub hasło", 401
 
 @app.route("/logout")
@@ -124,6 +134,19 @@ def register():
             db.commit()
             return redirect('/')
 
+@app.route("/new_password", methods=['GET', 'POST'])
+def new_password():
+    if request.method == 'GET':
+        return render_template("new_password.html")
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        re_email = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        if (re.fullmatch(re_email, email)):
+            print(f"Użytkownik poprosił o zmianę hasła, wysłałabym mu link: https://link_do_zmiany_hasla.pl na adres e-mail: '{email}'")
+            return "Link do zmiany hasła został wysłany."
+        else:
+            return "Podano nieprawidłowy adres email."
 
 @app.route("/hello", methods=['GET'])
 @login_required
@@ -142,16 +165,18 @@ def hello():
 @app.route("/render", methods=['POST'])
 @login_required
 def render():
-    md = bleach.clean(request.form.get("markdown", ""), tags=['b','i','h1','h2','h3','h4','h5','br'])
+    picture_url = request.form.get("picture_url")
+    url = request.form.get("url")
+    md = bleach.clean(request.form.get("markdown", ""), tags=['a','b','i','h1','h2','h3','h4','h5','br'])
     rendered = markdown.markdown(md)
     username = current_user.id
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
-    sql_query = "INSERT INTO notes (username, note) VALUES (?, ?);"
-    sql.execute(sql_query, (username, rendered,))
+    sql_query = "INSERT INTO notes (username, note, pictureURL) VALUES (?, ?, ?);"
+    sql.execute(sql_query, (username, rendered, picture_url,))
     #sql.execute(f"INSERT INTO notes (username, note) VALUES ('{username}', '{rendered}')")
     db.commit()
-    return render_template("markdown.html", rendered=rendered)
+    return render_template("markdown.html", rendered=rendered, picture_url=picture_url)
 
 
 @app.route("/render/<rendered_id>")
@@ -159,14 +184,14 @@ def render():
 def render_old(rendered_id):
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
-    sql_query = "SELECT username, note FROM notes WHERE id == ?"
+    sql_query = "SELECT username, note, pictureURL FROM notes WHERE id == ?"
     sql.execute(sql_query, (rendered_id,))
     #sql.execute(f"SELECT username, note FROM notes WHERE id == {rendered_id}")
     try:
-        username, rendered = sql.fetchone()
+        username, rendered, picture_url = sql.fetchone()
         if username != current_user.id:
             return "Access to note forbidden", 403
-        return render_template("markdown.html", rendered=rendered)
+        return render_template("markdown.html", rendered=rendered, picture_url=picture_url)
     except:
         return "Note not found", 404
 
