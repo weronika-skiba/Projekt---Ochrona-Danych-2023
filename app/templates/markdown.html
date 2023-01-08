@@ -2,7 +2,9 @@
 <body>
 <h1> Your rendered note: </h1>
 {{ rendered | safe }}
-<img width=256 src="{{picture_url}}">
+{% if picture_url|length > 0 %}
+  <img width=512 src="{{picture_url}}">
+{% endif %}
 <br>
 <form action={{ url_for('hello') }}>
   <input type="submit" value="Go back" />

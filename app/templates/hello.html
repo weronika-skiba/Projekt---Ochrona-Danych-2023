@@ -18,10 +18,22 @@
 <ul>
 {% for note in notes %}
   <li>
-    <form  method="post">
+    <form action={{ url_for('hello') }} method="post">
       <a href="{{ url_for('render') }}/{{note.0}}"> Note {{ loop.index }}</a>
-      <input type="submit" name="submit_publish" value="Publish">
-      <input type="submit" name="submit_protect" value="Protect">
+      <input type="hidden" id="note_id" name="note_id" value={{note[0]}} >
+      {% if note[1] == 0 %}
+        <input type="submit" id="submit_publish" name="submit_publish" value="Publish">
+      {% elif note[1] == 1 %}
+        <input type="submit" id="submit_unpublish" name="submit_unpublish" value="Unpublish">
+      {% endif %}
+
+      {% if note[2] == 0 %}
+        <input type="submit" id="submit_protect" name="submit_protect" value="Protect">
+      {% elif note[2] == 1 %}
+        <input type="submit" id="submit_not_protect" name="submit_not_protect" value="Do not protect">
+      {% endif %}
+
+
     </form>
   </li>
 {% endfor %}

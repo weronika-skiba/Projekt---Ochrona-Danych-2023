@@ -22,10 +22,10 @@ def restore_db():
     print("[*] Init database!")
     sq = sqlite3.connect(DATABASE)
     sql = sq.cursor()
-    sql.execute("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY, username VARCHAR(32), password VARCHAR(128));")
-    sql.execute("CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, username VARCHAR(32), count INTEGER);")
+    sql.execute("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, password VARCHAR(128) NOT NULL);")
+    sql.execute("CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, count INTEGER DEFAULT 0);")
     sql.execute(
-        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32), note VARCHAR(256), pictureURL VARCHAR(256), isPublic INTEGER, isProtected INTEGER, password VARCHAR(128));")
+        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, note VARCHAR(256) NOT NULL, pictureURL VARCHAR(256), isPublic INTEGER DEFAULT 0, isProtected INTEGER DEFAULT 0, password VARCHAR(128));")
     sq.commit()
     sq.close()
 
@@ -70,21 +70,31 @@ def login():
         user = user_loader(username)
         if user is None:
             return "Nieprawidłowy login lub hasło", 401
+        db = sqlite3.connect(DATABASE)
+        sql = db.cursor()
+        sql_query = "SELECT count(*) FROM login_attempts WHERE username = ?"
+        sql.execute(sql_query, (username,))
+        result = sql.fetchone()[0]
+        if result == 0:
+            sql_query = "INSERT INTO login_attempts (username) VALUES (?);"
+            sql.execute(sql_query, (username,))
+            db.commit()
+        sql_query = "SELECT count FROM login_attempts WHERE username = ?"
+        sql.execute(sql_query, (username,))
+        count = sql.fetchone()[0]
+        if count > 3:
+            return "Zbyt dużo nieudanych prób logowania. Konto zostało zablokowane.", 401
         if argon2.verify(password, user.password):
             time.sleep(0.5)
             login_user(user)
+            sql_query = "UPDATE login_attempts SET count = 0 WHERE username = ?"
+            sql.execute(sql_query, (username,))
+            db.commit()
             return redirect('/hello')
         else:
-            #db = sqlite3.connect(DATABASE)
-            #sql = db.cursor()
-            #sql_query = "SELECT count(*) FROM login_attempts WHERE username = ?"
-            #sql.execute(sql_query, (username,))
-            #result = sql.fetchone()[0]
-            #if result == 0:
-                #sql_query = "INSERT INTO login_attempts (username, count) VALUES (?, ?);"
-                #sql.execute(sql_query, (username, 0,))
-            #else:
-            #db.commit()
+            sql_query = "UPDATE login_attempts SET count = ? WHERE username = ?"
+            sql.execute(sql_query, (count+1, username,))
+            db.commit()
             return "Nieprawidłowy login lub hasło", 401
 
 @app.route("/logout")
@@ -129,8 +139,6 @@ def register():
                            'ascii')).hash(password)
             sql_query = "INSERT INTO user (username, password) VALUES (?, ?);"
             sql.execute(sql_query, (username, hash, ))
-           # sql.execute(
-            #    f"INSERT INTO user (username, password) VALUES ('{username}', '{argon2.using(salt= bytes(''.join(random.choices(population = string.ascii_letters, k = random.randint(10,15))), 'ascii')).hash(password)}');")
             db.commit()
             return redirect('/')
 
@@ -148,19 +156,44 @@ def new_password():
         else:
             return "Podano nieprawidłowy adres email."
 
-@app.route("/hello", methods=['GET'])
+
+@app.route("/hello", methods=['GET', 'POST'])
 @login_required
 def hello():
     if request.method == 'GET':
-        print(current_user.id)
         username = current_user.id
         db = sqlite3.connect(DATABASE)
         sql = db.cursor()
-        sql_query = "SELECT id FROM notes WHERE username == ?"
+        sql_query = "SELECT id, isPublic, isProtected FROM notes WHERE username == ? OR isPublic = 1"
         sql.execute(sql_query, (username,))
-        #sql.execute(f"SELECT id FROM notes WHERE username == '{username}'")
         notes = sql.fetchall()
         return render_template("hello.html", username=username, notes=notes)
+    if request.method == 'POST':
+        username = current_user.id
+        note_id = request.form.get("note_id")
+        db = sqlite3.connect(DATABASE)
+        sql = db.cursor()
+        if "submit_publish" in  request.form:
+            sql_query = "UPDATE notes SET isPublic = 1 WHERE username = ? AND id = ?"
+            sql.execute(sql_query, (username, note_id,))
+        elif "submit_unpublish" in request.form:
+            sql_query = "UPDATE notes SET isPublic = 0 WHERE username = ? AND id = ?"
+            sql.execute(sql_query, (username, note_id,))
+        elif "submit_protect" in request.form:
+            sql_query = "UPDATE notes SET isProtected = 1 WHERE username = ? AND id = ?"
+            sql.execute(sql_query, (username, note_id,))
+        elif "submit_not_protect" in request.form:
+            sql_query = "UPDATE notes SET isProtected = 0 WHERE username = ? AND id = ?"
+            sql.execute(sql_query, (username, note_id,))
+        db.commit()
+        db.close()
+        db = sqlite3.connect(DATABASE)
+        sql = db.cursor()
+        sql_query = "SELECT id, isPublic, isProtected FROM notes WHERE username == ? OR isPublic = 1"
+        sql.execute(sql_query, (username,))
+        notes = sql.fetchall()
+        return render_template("hello.html", username=username, notes=notes)
+
 
 @app.route("/render", methods=['POST'])
 @login_required
@@ -174,7 +207,6 @@ def render():
     sql = db.cursor()
     sql_query = "INSERT INTO notes (username, note, pictureURL) VALUES (?, ?, ?);"
     sql.execute(sql_query, (username, rendered, picture_url,))
-    #sql.execute(f"INSERT INTO notes (username, note) VALUES ('{username}', '{rendered}')")
     db.commit()
     return render_template("markdown.html", rendered=rendered, picture_url=picture_url)
 
@@ -186,7 +218,6 @@ def render_old(rendered_id):
     sql = db.cursor()
     sql_query = "SELECT username, note, pictureURL FROM notes WHERE id == ?"
     sql.execute(sql_query, (rendered_id,))
-    #sql.execute(f"SELECT username, note FROM notes WHERE id == {rendered_id}")
     try:
         username, rendered, picture_url = sql.fetchone()
         if username != current_user.id:
