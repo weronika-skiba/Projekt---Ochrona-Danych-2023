@@ -3,12 +3,18 @@
 <h1>Hello {{ username }}!</h1>
 
 <form action={{ url_for('render') }} method="post">
-  <label for="markdown">Input a new note:</label><br>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <label for="markdown">Input a new note:</label><br><br>
   <textarea id="markdown" name="markdown" rows="20" cols="100"></textarea>
   <br>
   <br>
-  <label for="picture_url">Add a picture from url to your new note: </label>
-  <input type="text" id="picture_url" name="picture_url"><br>
+  <label for="protect">Tick the box to protect your note:  </label>
+  <input type="checkbox" id="protect" name="protect">
+  <br>
+  <br>
+  <label for="key">Provide the encryption if you ticked the box: </label><br><br>
+  <input type="text" id="key" name="key">
+  <br>
   <br>
   <input type="submit" value="Save note">
 </form>
@@ -19,21 +25,15 @@
 {% for note in notes %}
   <li>
     <form action={{ url_for('hello') }} method="post">
+      <em>Author: {{note[4]}} Created: {{note[3]}}</em>
       <a href="{{ url_for('render') }}/{{note.0}}"> Note {{ loop.index }}</a>
-      <input type="hidden" id="note_id" name="note_id" value={{note[0]}} >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="hidden" id="note_id" name="note_id" value={{note[0]}}>
       {% if note[1] == 0 %}
         <input type="submit" id="submit_publish" name="submit_publish" value="Publish">
       {% elif note[1] == 1 %}
         <input type="submit" id="submit_unpublish" name="submit_unpublish" value="Unpublish">
       {% endif %}
-
-      {% if note[2] == 0 %}
-        <input type="submit" id="submit_protect" name="submit_protect" value="Protect">
-      {% elif note[2] == 1 %}
-        <input type="submit" id="submit_not_protect" name="submit_not_protect" value="Do not protect">
-      {% endif %}
-
-
     </form>
   </li>
 {% endfor %}
@@ -43,6 +43,7 @@
 
 
 <form action={{ url_for('logout') }}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="submit" value="Log out" />
 </form>
 </body>
