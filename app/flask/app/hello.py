@@ -2,7 +2,7 @@ import string
 from Cryptodome.Cipher import AES
 from flask import Flask, render_template, request, make_response, redirect, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_mail import Mail, Message
+#from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect
 import markdown
 from collections import deque
@@ -21,13 +21,15 @@ app.secret_key = "206363ef77d567cc511df5098695d2b85058952afd5e2b1eecd5aed981805e
 csrf.init_app(app)
 login_manager.init_app(app)
 
-app.config['MAIL_SERVER']='smtp.gmail.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USERNAME'] = 'sabinafedyna@gmail.com'
-app.config['MAIL_PASSWORD'] = 'sabina'
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USE_SSL'] = True
-mail = Mail(app)
+#konfiguracja do wysyłania maili w celu odzyskania hasła, nie mogłam wydobyć hasła dla aplikacji z konta google i uruchomić
+#dlatego
+#app.config['MAIL_SERVER']='smtp.gmail.com'
+#app.config['MAIL_PORT'] = 465
+#app.config['MAIL_USERNAME'] = 'sabinafedyna@gmail.com'
+#app.config['MAIL_PASSWORD'] = 'sabina'
+#app.config['MAIL_USE_TLS'] = False
+#app.config['MAIL_USE_SSL'] = True
+#mail = Mail(app)
 
 @app.after_request
 def add_security_headers(response):
@@ -291,4 +293,4 @@ def decrypted():
 
 if __name__ == "__main__":
     print(__name__)
-    app.run("0.0.0.0", 5000)
+    app.run("0.0.0.0", 8000)

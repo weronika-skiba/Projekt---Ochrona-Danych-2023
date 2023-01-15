@@ -1,5 +1,7 @@
 flask
+gunicorn
 pycryptodomex
+flask_mail
 flask_login
 flask_wtf
 markdown

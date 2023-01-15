@@ -1,20 +1,33 @@
+version: "3"
+
 services:
   flask:
     build:
       context: flask
+    container_name: flask
     restart: always
-    expose:
-      - 5000
+    networks:
+      - mynetwork
 
   nginx:
-    build: nginx
+    build:
+      context: nginx
     restart: always
     volumes:
-      - ./nginx/confi/:/etc/nginx/conf.d/:ro
+      - ./nginx/confi/default.conf:/etc/nginx/conf.d/default.conf
       - ./nginx/self.crt:/etc/ssl/certs/self.crt:ro
       - ./nginx/self.key:/etc/ssl/private/self.key:ro
     ports:
-      - "80:80"
-      - "443:443"
+      - 80:80
+      - 443:443
     depends_on: 
       - flask
+    networks:
+      mynetwork:
+        aliases:
+          - flask
+
+networks:
+  mynetwork:
+
+

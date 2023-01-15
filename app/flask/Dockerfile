@@ -1,8 +1,16 @@
-FROM python:3.10.9-alpine
+FROM python:3.7-slim
 
-WORKDIR /app
-COPY . .
+WORKDIR = /var/www
+ADD ./app /app
+COPY ./requirements.txt .
 RUN pip3 install -r requirements.txt
 
-CMD gunicorn --bind 0.0.0.0:5000 run:app
+ENV FLASK_APP hello.py
+ENV FLASK_RUN_PORT 8000
+ENV FLASK_RUN_HOST 0.0.0.0
 
+EXPOSE 8000
+
+CMD ["flask", "run"]
+
+CMD
