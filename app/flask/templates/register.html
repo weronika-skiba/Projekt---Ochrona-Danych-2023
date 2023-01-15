@@ -1,0 +1,21 @@
+<html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<form action={{ url_for('register') }} method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <label for="username">Username: </label>
+  <input class="text-1" type="text" id="username" name="username"><br>
+  <label for="email">Email address: </label>
+  <input class="text-1" type="text" id="email" name="email"><br>
+  <label for="password">Password: </label>
+  <input class="text-1" type="password" id="password" name="password"><br><br><br>
+  <input class="button-36" type="submit" value="Register">
+</form>
+<form action={{ url_for('login') }}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input class="button-36" type="submit" value="Go back" />
+</form>
+</body>
+</html>

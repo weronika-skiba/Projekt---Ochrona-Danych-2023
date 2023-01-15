@@ -1,0 +1,22 @@
+<html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<h1> Your rendered note: </h1>
+{{ rendered | safe }}
+<br>
+
+<form action= {{ url_for('decrypted') }} method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input type="hidden" id="rendered_id" name="rendered_id" value="{{ rendered_id }}"/>
+  <label for="key">Provide key to decrypt your note: </label><br><br>
+  <input class="text-1" type="text" id="key" name="key"><br><br><br>
+  <input class="button-36" type="submit" value="Submit">
+</form>
+<form action={{ url_for('hello') }}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input class="button-36" type="submit" value="Go back" />
+</form>
+</body>
+</html>

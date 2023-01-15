@@ -1,0 +1,8 @@
+flask
+pycryptodomex
+flask_login
+flask_wtf
+markdown
+passlib
+bleach
+argon2_cffi 

@@ -1,0 +1,51 @@
+<html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<h1>Hello {{ username }}!</h1>
+
+<form action={{ url_for('render') }} method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <label for="markdown">Input a new note:</label><br><br>
+  <textarea id="markdown" name="markdown" rows="20" cols="100"></textarea>
+  <br>
+  <br>
+  <label for="encrypt">Tick the box to encrypt your note:  </label>
+  <input class="checkbox-wrapper-5" type="checkbox" id="encrypt" name="encrypt">
+  <br>
+  <br>
+  <label for="key">Provide the encryption key if you ticked the box (16 characters): </label><br><br>
+  <input class="text-1" type="text" id="key" name="key">
+  <br>
+  <br>
+  <input class="button-36" type="submit" value="Save note">
+</form>
+
+{% if notes|length > 0 %}
+<h1> Your notes: </h1>
+<ul>
+{% for note in notes %}
+  <li>
+    <form action={{ url_for('hello') }} method="post">
+    <em class="text-2"><b>Author:</b> {{note[1]}} <b>Created:</b> {{note[2]}}</em>
+      <a class="button-34" href="{{ url_for('render') }}/{{note.0}}"> Note {{ loop.index }}</a>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="hidden" id="note_id" name="note_id" value={{note[0]}}>
+      {% if note[3] == 0 and note[1] == username and note[4] == 0 %}
+        <input class="button-35" type="submit" id="submit_publish" name="submit_publish" value="Publish">
+      {% elif note[3] == 1 and note[1] == username and note[4] == 0 %}
+        <input class="button-35" type="submit" id="submit_unpublish" name="submit_unpublish" value="Unpublish">
+      {% endif %}
+    </form>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<form action={{ url_for('logout') }}>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input class="button-36" type="submit" value="Log out" />
+</form>
+</body>
+</html>

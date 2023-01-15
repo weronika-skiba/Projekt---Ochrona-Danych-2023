@@ -1,19 +1,20 @@
-version: "3.9"
-
 services:
-  flask_app:
+  flask:
     build:
-      context: ./
-      dockerfile: Dockerfile
-    container_name: flask_app
+      context: flask
+    restart: always
+    expose:
+      - 5000
+
   nginx:
-    image: nginx
-    container_name: nginx
+    build: nginx
+    restart: always
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./key.pem:/root/ssl/key.pem
-      - ./cert.pem:/root/ssl/cert.pem
+      - ./nginx/confi/:/etc/nginx/conf.d/:ro
+      - ./nginx/self.crt:/etc/ssl/certs/self.crt:ro
+      - ./nginx/self.key:/etc/ssl/private/self.key:ro
     ports:
+      - "80:80"
       - "443:443"
-    depends_on:
-      - flask_app
+    depends_on: 
+      - flask

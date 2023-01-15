@@ -1,6 +1,8 @@
 import string
-from flask import Flask, render_template, request, make_response, redirect
+from Cryptodome.Cipher import AES
+from flask import Flask, render_template, request, make_response, redirect, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect
 import markdown
 from collections import deque
@@ -19,21 +21,29 @@ app.secret_key = "206363ef77d567cc511df5098695d2b85058952afd5e2b1eecd5aed981805e
 csrf.init_app(app)
 login_manager.init_app(app)
 
+app.config['MAIL_SERVER']='smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = 'sabinafedyna@gmail.com'
+app.config['MAIL_PASSWORD'] = 'sabina'
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
+
 @app.after_request
 def add_security_headers(response):
     response.headers['Content-Security-Policy']="default-src 'self'; img-src * data:;"
     return response
 
 def restore_db():
-    print("[*] Init database!")
-    sq = sqlite3.connect(DATABASE)
-    sql = sq.cursor()
+    print("[*] Restore database if needed")
+    db = sqlite3.connect(DATABASE)
+    sql = db.cursor()
     sql.execute("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, email VARCHAR(128) NOT NULL, password VARCHAR(1024) NOT NULL);")
     sql.execute("CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, count INTEGER DEFAULT 0);")
     sql.execute(
-        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, note VARCHAR(1024) NOT NULL, isPublic INTEGER DEFAULT 0, isProtected INTEGER DEFAULT 0, password VARCHAR(128), datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-    sq.commit()
-    sq.close()
+        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, username VARCHAR(32) NOT NULL, note VARCHAR(1024) NOT NULL, isPublic INTEGER DEFAULT 0, isEncrypted INTEGER DEFAULT 0, datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
+    db.commit()
+    db.close()
 
 restore_db()
 
@@ -44,7 +54,6 @@ class User(UserMixin):
 def user_loader(username):
     if username is None:
         return None
-
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
     sql_query = "SELECT username, password FROM user WHERE username = ?"
@@ -78,13 +87,6 @@ def login():
             return "Nieprawidłowy login lub hasło", 401
         db = sqlite3.connect(DATABASE)
         sql = db.cursor()
-        sql_query = "SELECT count(*) FROM login_attempts WHERE username = ?"
-        sql.execute(sql_query, (username,))
-        result = sql.fetchone()[0]
-        if result == 0:
-            sql_query = "INSERT INTO login_attempts (username) VALUES (?);"
-            sql.execute(sql_query, (username,))
-            db.commit()
         sql_query = "SELECT count FROM login_attempts WHERE username = ?"
         sql.execute(sql_query, (username,))
         count = sql.fetchone()[0]
@@ -153,7 +155,10 @@ def register():
                            'ascii')).hash(password)
             sql_query = "INSERT INTO user (username, email, password) VALUES (?, ?, ?);"
             sql.execute(sql_query, (username, email, hash, ))
+            sql_query = "INSERT INTO login_attempts (username) VALUES (?);"
+            sql.execute(sql_query, (username,))
             db.commit()
+            db.close()
             return redirect('/')
 
 @app.route("/new_password", methods=['GET', 'POST'])
@@ -172,6 +177,9 @@ def new_password():
         if not (re.fullmatch(re_email, email)):
             return "Podano nieprawidłowy adres email."
         if result == 1:
+            msg = Message('Link do zmiany hasła.', sender='notes@gmail.com', recipients=['weronikaagataskiba@gmail.com'])
+            msg.body = f"Hej {username}, przesyłam link do zmiany hasła https://link_do_zmiany_hasla.pl"
+            mail.send(msg)
             print(f"Użytkownik '{username}' poprosił o zmianę hasła, wysłałabym mu link: https://link_do_zmiany_hasla.pl na adres e-mail: '{email}'")
             return "Link do zmiany hasła został wysłany."
         else:
@@ -185,7 +193,7 @@ def hello():
         username = current_user.id
         db = sqlite3.connect(DATABASE)
         sql = db.cursor()
-        sql_query = "SELECT id, isPublic, isProtected, datetime, username FROM notes WHERE username == ? OR isPublic = 1"
+        sql_query = "SELECT id, username, datetime, isPublic, isEncrypted FROM notes WHERE username == ? OR isPublic = 1"
         sql.execute(sql_query, (username,))
         notes = sql.fetchall()
         return render_template("hello.html", username=username, notes=notes)
@@ -204,24 +212,44 @@ def hello():
         db.close()
         db = sqlite3.connect(DATABASE)
         sql = db.cursor()
-        sql_query = "SELECT id, isPublic, isProtected, datetime, username FROM notes WHERE username == ? OR isPublic = 1"
+        sql_query = "SELECT id, username, datetime, isPublic, isEncrypted FROM notes WHERE username == ? OR isPublic = 1"
         sql.execute(sql_query, (username,))
         notes = sql.fetchall()
         return render_template("hello.html", username=username, notes=notes)
 
+def nullpadding(data, length=16):
+    return data + b"\x00"*(length-len(data) % length)
 
 @app.route("/render", methods=['POST'])
 @login_required
 def render():
-    md = bleach.clean(request.form.get("markdown", ""), tags=['a','p','b','i','h1','h2','h3','h4','h5','br'])
-    rendered = markdown.markdown(md)
-    username = current_user.id
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
-    sql_query = "INSERT INTO notes (username, note) VALUES (?, ?);"
-    sql.execute(sql_query, (username, rendered,))
-    db.commit()
-    return render_template("markdown.html", rendered=rendered)
+    username = current_user.id
+    md = bleach.clean(request.form.get("markdown"), tags=['a','p','b','i','h1','h2','h3','h4','h5','br'])
+    rendered = markdown.markdown(md)
+    encrypt = request.form.get("encrypt")
+    if encrypt == 'on':
+        key = request.form.get("key")
+        if len(key) == 0:
+            return "Zaznaczyłeś/aś pole szyfrowania notatki. Podaj 16-znakowy klucz."
+        if len(key) != 16:
+            return "Podaj klucz o długości 16 znaków"
+        key_encoded = key.encode("utf-8")
+        data_encoded = nullpadding(rendered.encode("utf-8"))
+        aes = AES.new(key_encoded, AES.MODE_CBC, key_encoded)
+        encrypted_note = aes.encrypt(data_encoded)
+        sql_query = "INSERT INTO notes (username, note, isEncrypted) VALUES (?, ?, 1);"
+        sql.execute(sql_query, (username, encrypted_note))
+        db.commit()
+        db.close()
+        return render_template("markdown.html", rendered=encrypted_note)
+    else:
+        sql_query = "INSERT INTO notes (username, note) VALUES (?, ?);"
+        sql.execute(sql_query, (username, rendered,))
+        db.commit()
+        db.close()
+        return render_template("markdown.html", rendered=rendered)
 
 
 @app.route("/render/<rendered_id>")
@@ -229,13 +257,34 @@ def render():
 def render_old(rendered_id):
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
-    sql_query = "SELECT username, note FROM notes WHERE id == ?"
+    sql_query = "SELECT username, isPublic, note FROM notes WHERE id == ?"
     sql.execute(sql_query, (rendered_id,))
     try:
-        username, rendered = sql.fetchone()
-        if username != current_user.id:
+        username, isPublic, rendered = sql.fetchone()
+        if username != current_user.id and isPublic == 0:
             return "Access to note forbidden", 403
-        return render_template("markdown.html", rendered=rendered)
+        return render_template("markdown_old.html", rendered=rendered, rendered_id = rendered_id)
+    except:
+        return "Note not found", 404
+
+@app.route("/decrypted", methods=['POST'])
+@login_required
+def decrypted():
+    key = request.form.get("key")
+    rendered_id = request.form.get("rendered_id")
+    db = sqlite3.connect(DATABASE)
+    sql = db.cursor()
+    sql_query = "SELECT username, isPublic, note FROM notes WHERE id == ?"
+    sql.execute(sql_query, (rendered_id,))
+    try:
+        username, isPublic, rendered = sql.fetchone()
+        if username != current_user.id and isPublic == 0:
+            return "Access to note forbidden", 403
+        key_encoded = key.encode("utf-8")
+        aes = AES.new(key_encoded, AES.MODE_CBC, key_encoded)
+        decrypted_note = (aes.decrypt(rendered)).decode("utf-8")
+        print(rendered_id, "tutaj")
+        return render_template("markdown.html", rendered=decrypted_note, note_id=rendered_id)
     except:
         return "Note not found", 404
 

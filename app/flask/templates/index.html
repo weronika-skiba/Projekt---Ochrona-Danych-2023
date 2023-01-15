@@ -1,20 +1,23 @@
 <html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
 <body>
 <form action={{ url_for('login') }} method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <label for="username">Username: </label>
-  <input type="text" id="username" name="username"><br>
+  <input class="text-1" type="text" id="username" name="username"><br>
   <label for="password">Password: </label>
-  <input type="password" id="password" name="password"><br>
-  <input type="submit" value="Log in">
+  <input class="text-1" type="password" id="password" name="password"><br><br><br>
+  <input class="button-36" type="submit" value="Log in">
 </form>
 <form action={{ url_for('register') }}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-  <input type="submit" value="Register">
+  <input class="button-36" type="submit" value="Register">
 </form>
 <form action={{ url_for('new_password') }}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-  <input type="submit" value="I forgot my password">
+  <input class="button-36" type="submit" value="I forgot my password">
 </form>
 
 </body>
