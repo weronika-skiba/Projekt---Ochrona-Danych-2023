@@ -1,6 +1,6 @@
 import string
 from Cryptodome.Cipher import AES
-from flask import Flask, render_template, request, make_response, redirect, flash
+from flask import Flask, render_template, request, make_response, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 #from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect
@@ -21,11 +21,10 @@ app.secret_key = "206363ef77d567cc511df5098695d2b85058952afd5e2b1eecd5aed981805e
 csrf.init_app(app)
 login_manager.init_app(app)
 
-#konfiguracja do wysyłania maili w celu odzyskania hasła, nie mogłam wydobyć hasła dla aplikacji z konta google i uruchomić
-#dlatego
+#Nie udało mi się utworzyć realnego modułu do wysyłania maili, ponieważ nie mogłam wydobyć hasła do aplikacji z gmail lub outlook.
 #app.config['MAIL_SERVER']='smtp.gmail.com'
-#app.config['MAIL_PORT'] = 465
-#app.config['MAIL_USERNAME'] = 'sabinafedyna@gmail.com'
+#app.config['MAIL_PORT'] = 25
+#app.config['MAIL_USERNAME'] = 'notify@me.com'
 #app.config['MAIL_PASSWORD'] = 'sabina'
 #app.config['MAIL_USE_TLS'] = False
 #app.config['MAIL_USE_SSL'] = True
@@ -93,7 +92,7 @@ def login():
         sql.execute(sql_query, (username,))
         count = sql.fetchone()[0]
         if count > 3:
-            return "Zbyt dużo nieudanych prób logowania. Konto zostało zablokowane.", 401
+            return "Zbyt dużo nieudanych prób logowania. Konto zostało zablokowane. Aby odblokować konto, zresetuj hasło.", 401
         if argon2.verify(password, user.password):
             time.sleep(0.5)
             login_user(user)
@@ -179,14 +178,17 @@ def new_password():
         if not (re.fullmatch(re_email, email)):
             return "Podano nieprawidłowy adres email."
         if result == 1:
-            msg = Message('Link do zmiany hasła.', sender='notes@gmail.com', recipients=['weronikaagataskiba@gmail.com'])
-            msg.body = f"Hej {username}, przesyłam link do zmiany hasła https://link_do_zmiany_hasla.pl"
-            mail.send(msg)
-            print(f"Użytkownik '{username}' poprosił o zmianę hasła, wysłałabym mu link: https://link_do_zmiany_hasla.pl na adres e-mail: '{email}'")
+            #msg = Message('Link do zmiany hasła.', sender='flask@app.com', recipients=email)
+            #msg.body = f"Hej {username}, przesyłam link do zmiany hasła https://link_do_zmiany_hasla.pl"
+            #mail.send(msg)
+            print(f'''Użytkownik '{username}' poprosił o zmianę hasła, wysłałabym mu link: {url_for('reset_password')} na adres e-mail: '{email}''')
             return "Link do zmiany hasła został wysłany."
         else:
             return "Podano nieprawidłowe dane."
 
+@app.route("/reset_password")
+def reset_password():
+    return render_template("reset_password.html")
 
 @app.route("/hello", methods=['GET', 'POST'])
 @login_required
@@ -290,7 +292,3 @@ def decrypted():
     except:
         return "Note not found", 404
 
-
-if __name__ == "__main__":
-    print(__name__)
-    app.run("0.0.0.0", 8000)
