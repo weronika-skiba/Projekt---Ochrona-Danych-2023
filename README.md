@@ -2,4 +2,4 @@
 
 ## Aby uruchomić aplikację należy przejść do folderu "app" i wykonać polecenie:
 
-   docker compose up.
+   docker compose up --build.
