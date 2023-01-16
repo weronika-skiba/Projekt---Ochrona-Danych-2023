@@ -6,8 +6,12 @@ services:
       context: flask
     container_name: flask
     restart: always
+    env_file:
+      - .env
     networks:
-      - mynetwork
+      mynetwork:
+        aliases:
+          - flask
 
   nginx:
     build:
@@ -23,9 +27,7 @@ services:
     depends_on: 
       - flask
     networks:
-      mynetwork:
-        aliases:
-          - flask
+      - mynetwork
 
 networks:
   mynetwork:

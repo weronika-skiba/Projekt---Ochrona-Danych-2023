@@ -6,18 +6,23 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_wtf.csrf import CSRFProtect
 import markdown
 from collections import deque
+from dotenv import load_dotenv
 from passlib.hash import argon2
 import sqlite3
 import time
 import bleach
 import random
 import re
+import os
+
+load_dotenv()
 
 csrf = CSRFProtect()
 login_manager = LoginManager()
 DATABASE = "./sqlite3.db"
 app = Flask(__name__)
-app.secret_key = "206363ef77d567cc511df5098695d2b85058952afd5e2b1eecd5aed981805e60"
+app.secret_key = os.getenv('SECRET_KEY')
+app.config['WTF_CSRF_SECRET_KEY']=  os.getenv('WTF_CSRF_SECRET_KEY')
 csrf.init_app(app)
 login_manager.init_app(app)
 
@@ -177,6 +182,8 @@ def new_password():
         re_email = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         if not (re.fullmatch(re_email, email)):
             return "Podano nieprawidłowy adres email."
+        if len(username) <= 0 or len(username) > 32:
+            return "Podaj prawidłową nazwę użytkownika."
         if result == 1:
             #msg = Message('Link do zmiany hasła.', sender='flask@app.com', recipients=email)
             #msg.body = f"Hej {username}, przesyłam link do zmiany hasła https://link_do_zmiany_hasla.pl"
@@ -230,7 +237,7 @@ def render():
     db = sqlite3.connect(DATABASE)
     sql = db.cursor()
     username = current_user.id
-    md = bleach.clean(request.form.get("markdown"), tags=['a','p','b','i','h1','h2','h3','h4','h5','br'])
+    md = bleach.clean(request.form.get("markdown"), tags=['a','em','p','li', 'ol', 'strong', 'ul','b','i','h1','h2','h3','h4','h5','br'])
     rendered = markdown.markdown(md)
     encrypt = request.form.get("encrypt")
     if encrypt == 'on':

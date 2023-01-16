@@ -1,5 +1,6 @@
 flask
 gunicorn
+python-dotenv
 pycryptodomex
 flask_mail
 flask_login
